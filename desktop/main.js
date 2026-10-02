@@ -337,6 +337,19 @@ app.whenReady().then(() => {
         console.log('SPRITES_READY');
         console.log(`OZONE_PLATFORM=${app.commandLine.getSwitchValue('ozone-platform')}`);
         console.log(`WINDOW_VISIBLE=${window.isVisible()}`);
+        const [initialX, initialY] = window.getPosition();
+        try {
+          state.x = initialX + 20;
+          state.y = initialY;
+          window.setPosition(initialX + 20, initialY);
+          setTimeout(() => {
+            const [movedX, movedY] = window.getPosition();
+            console.log(`WINDOW_MOVED=${movedX === initialX + 20 && movedY === initialY}`);
+          }, 100);
+        } catch (error) {
+          console.error('Déplacement impossible pendant le test Linux', error);
+          console.log('WINDOW_MOVED=false');
+        }
       }
     }
     else if (type === 'assets-error') dialog.showErrorBox('Sprites introuvables', 'Les images de Codex Promenade manquent dans cette installation.');
