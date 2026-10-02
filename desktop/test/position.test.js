@@ -52,6 +52,19 @@ test('une position invalide ne parvient pas à Electron', () => {
   assert.deepEqual(positions[0], [552, 672]);
 });
 
+test('les coordonnées arrondies à zéro ne transmettent pas -0 à Electron', () => {
+  const { hooks, positions } = loadDraw();
+  hooks.state.x = -0.4;
+  hooks.state.y = 500;
+  hooks.draw();
+  hooks.state.x = 100;
+  hooks.state.y = -0.4;
+  hooks.draw();
+  assert.deepEqual(positions, [[0, 500], [100, 0]]);
+  assert.equal(Object.is(positions[0][0], -0), false);
+  assert.equal(Object.is(positions[1][1], -0), false);
+});
+
 test('un refus du système arrête les tentatives de déplacement', () => {
   const { hooks, positions } = loadDraw(() => { throw new TypeError('conversion failure'); });
   hooks.state.x = 100;

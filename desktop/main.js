@@ -180,8 +180,10 @@ function draw() {
     begin('idle', 1.8);
     bob = 0;
   }
-  const x = Math.round(state.x);
-  const y = Math.round(state.y + bob);
+  // Math.round can return -0 near a screen edge; Electron rejects it as a
+  // window coordinate even though it compares equal to 0 in JavaScript.
+  const x = Math.round(state.x) || 0;
+  const y = Math.round(state.y + bob) || 0;
   const previous = window.getPosition();
   if (positioningAvailable && (previous[0] !== x || previous[1] !== y)) {
     try { window.setPosition(x, y); }
@@ -307,11 +309,13 @@ app.whenReady().then(() => {
   state.nextWave = now + rand(9, 18);
   state.nextLaugh = now + rand(12, 24);
   state.nextRest = now + rand(35, 60);
+  const resourceFolder = app.isPackaged ? path.join(process.resourcesPath, 'sprites') : path.join(__dirname, '..', 'Resources');
   window = new BrowserWindow({
     x: state.x, y: state.y, width: WIDTH, height: HEIGHT,
     frame: false, transparent: true, hasShadow: false,
     resizable: false, maximizable: false, fullscreenable: false,
     alwaysOnTop: true, skipTaskbar: true, show: false,
+    ...(process.platform === 'linux' ? { icon: path.join(resourceFolder, 'CodexPromenade-icon.png') } : {}),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true, nodeIntegration: false }
   });
   window.setMenu(null);
@@ -321,8 +325,7 @@ app.whenReady().then(() => {
   window.loadFile(path.join(__dirname, 'index.html'));
   ipcMain.handle('pet-asset-url', (event, name) => {
     if (event.sender !== window.webContents || !/^codex-[a-z0-9-]+\.(png|webp)$/.test(name)) return null;
-    const folder = app.isPackaged ? path.join(process.resourcesPath, 'sprites') : path.join(__dirname, '..', 'Resources');
-    return pathToFileURL(path.join(folder, name)).href;
+    return pathToFileURL(path.join(resourceFolder, name)).href;
   });
   ipcMain.on('pet-action', (event, type) => {
     if (event.sender !== window.webContents) return;
