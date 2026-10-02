@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# GitHub's temporary runner installs npm files as the unprivileged runner
+# account. Chromium needs its sandbox helper owned by root and setuid.
+node node_modules/electron/install.js
+sudo chown root:root node_modules/electron/dist/chrome-sandbox
+sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+
 log_file="$(mktemp)"
 trap 'rm -f "$log_file"' EXIT
 set +e
