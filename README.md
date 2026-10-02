@@ -4,11 +4,9 @@
 
 Le dépôt public est **[MrsMega/Codex-companion](https://github.com/MrsMega/Codex-companion)**.
 La [page Releases](https://github.com/MrsMega/Codex-companion/releases)
-regroupe les téléchargements. La version 2.9.0 est préparée avec le même code
-Electron et les mêmes animations pour Linux, macOS et Windows. La publication
-est bloquée tant que les trois paquets et leurs métadonnées de mise à jour ne
-sont pas disponibles. La dernière version publiée sans macOS est
-[2.8.2](https://github.com/MrsMega/Codex-companion/releases/tag/v2.8.2).
+regroupe les téléchargements. La version 2.9.0 est publiée pour Linux et
+Windows à partir du même code Electron. Un paquet macOS sera ajouté après la
+mise en place de la signature et de la notarisation Apple.
 
 | Système | Premier téléchargement | Mises à jour suivantes |
 | --- | --- | --- |
@@ -37,16 +35,15 @@ Electron : il faut installer une fois la première release macOS.
    vérification GitHub Actions contrôle le code, les paquets et les sprites.
 3. Pour publier une version, mettre à jour `desktop/package.json` et son
    `package-lock.json`, puis pousser le tag correspondant, par exemple
-   `v2.9.0`. GitHub Actions construit Linux, Windows et macOS, crée une release
-   brouillon puis la rend publique seulement après vérification des trois
-   paquets et des fichiers de mise à jour.
-4. Avant de pousser le tag, configurer un certificat Apple Developer
+   `v2.9.0`. GitHub Actions construit Linux et Windows, crée une release
+   brouillon puis la rend publique après vérification des deux paquets et des
+   fichiers de mise à jour.
+4. Pour ajouter macOS aux releases, configurer un certificat Apple Developer
    ID, la notarisation et les secrets GitHub `MAC_CSC_LINK`,
    `MAC_CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` et
    `APPLE_TEAM_ID`. Définir ensuite la variable GitHub Actions
-   `MAC_RELEASE_READY=true`. Sans ces éléments, la publication entière échoue
-   avant la création de la release pour éviter des versions différentes selon
-   le système.
+   `MAC_RELEASE_READY=true`. Sans ces éléments, le build macOS de publication
+   est ignoré afin de ne pas distribuer une application bloquée par Gatekeeper.
    Un certificat Windows facultatif se configure avec `WIN_CSC_LINK` et
    `WIN_CSC_KEY_PASSWORD` ; sans lui Windows peut afficher un avertissement.
 

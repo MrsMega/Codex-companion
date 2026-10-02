@@ -86,20 +86,6 @@ jobs:
           test "${GITHUB_REF_NAME}" = "v${version}"
           test "$version" = "$lock_version"
           test "$version" = "$mac_version"
-      - name: Vérifier la publication sur les trois systèmes
-        shell: bash
-        env:
-          MAC_RELEASE_READY: ${{ vars.MAC_RELEASE_READY }}
-          MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
-          MAC_CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          if [[ "$MAC_RELEASE_READY" != true || -z "$MAC_CSC_LINK" || -z "$MAC_CSC_KEY_PASSWORD" || -z "$APPLE_ID" || -z "$APPLE_APP_SPECIFIC_PASSWORD" || -z "$APPLE_TEAM_ID" ]]; then
-            echo 'La publication nécessite la signature et la notarisation macOS pour livrer Linux, Windows et macOS ensemble.' >&2
-            exit 1
-          fi
       - name: Créer une release brouillon
         env:
           GH_TOKEN: ${{ github.token }}
@@ -150,7 +136,7 @@ jobs:
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
         run: npx electron-builder --win --publish always
       - name: Construire macOS signé et notarisé
-        if: matrix.platform == 'mac'
+        if: matrix.platform == 'mac' && vars.MAC_RELEASE_READY == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
@@ -169,13 +155,22 @@ jobs:
       - name: Publier la release et activer les mises à jour
         env:
           GH_TOKEN: ${{ github.token }}
+          MAC_RELEASE_READY: ${{ vars.MAC_RELEASE_READY }}
         shell: bash
         run: |
           assets=$(gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[].name')
-          for pattern in '\.AppImage$' '\.exe$' '\.dmg$' '\.zip$' '^latest-linux.yml$' '^latest.yml$' '^latest-mac.yml$'; do
+          for pattern in '\.AppImage$' '\.exe$' '^latest-linux.yml$' '^latest.yml$'; do
             if ! grep -Eq "$pattern" <<< "$assets"; then
               echo "Paquet ou métadonnées de mise à jour manquants : $pattern" >&2
               exit 1
             fi
           done
+          if [[ "$MAC_RELEASE_READY" == true ]]; then
+            for pattern in '\.dmg$' '\.zip$' '^latest-mac.yml$'; do
+              if ! grep -Eq "$pattern" <<< "$assets"; then
+                echo "Paquet ou métadonnées macOS manquants : $pattern" >&2
+                exit 1
+              fi
+            done
+          fi
           gh release edit "$GITHUB_REF_NAME" --draft=false
