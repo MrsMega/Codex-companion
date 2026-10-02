@@ -25,6 +25,8 @@ jobs:
           cache-dependency-path: desktop/package-lock.json
       - run: npm ci
       - run: npm run check
+      - name: Démarrage et chargement des sprites sous X11 virtuel
+        run: bash scripts/smoke-linux.sh
       - name: Vérifier les sprites
         run: |
           test -f ../Resources/codex-spritesheet-v6.webp
@@ -71,6 +73,9 @@ jobs:
           cache-dependency-path: desktop/package-lock.json
       - run: npm ci
       - run: npm run check
+      - name: Démarrage et chargement des sprites sous X11 virtuel
+        if: matrix.platform == 'linux'
+        run: bash scripts/smoke-linux.sh
       - name: Construire Linux
         if: matrix.platform == 'linux'
         env:

@@ -327,7 +327,12 @@ app.whenReady().then(() => {
     if (['down', 'move', 'up'].includes(type)) handlePointer(type);
     else if (type === 'menu') showMenu();
     else if (type === 'double' && !state.dragging) shell.openExternal('https://chatgpt.com/');
-    else if (type === 'assets-ready') { readyToDraw = true; window.showInactive(); draw(); }
+    else if (type === 'assets-ready') {
+      readyToDraw = true;
+      window.showInactive();
+      draw();
+      if (process.env.CODEX_SMOKE_TEST === '1') console.log('SPRITES_READY');
+    }
     else if (type === 'assets-error') dialog.showErrorBox('Sprites introuvables', 'Les images de Codex Promenade manquent dans cette installation.');
   });
   timer = setInterval(tick, 1000 / 60);
