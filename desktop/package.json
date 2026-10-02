@@ -11,7 +11,7 @@
   },
   "scripts": {
     "start": "electron .",
-    "check": "node --check main.js && node --check preload.js && node --check renderer.js",
+    "check": "node --check main.js && node --check preload.js && node --check renderer.js && node --test test/*.test.js",
     "dist": "electron-builder --publish never"
   },
   "dependencies": {

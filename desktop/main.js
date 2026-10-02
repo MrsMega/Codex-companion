@@ -19,6 +19,7 @@ let updateReady = false;
 let checkingForUpdate = false;
 let lastUpdateError = null;
 let manualUpdateCheck = false;
+let positioningAvailable = true;
 
 const state = {
   x: 0, y: 0, activity: 'idle', age: 0, duration: 1.8,
@@ -161,10 +162,32 @@ function draw() {
     const t = clamp(state.age / state.duration, 0, 1);
     bob = -184 * t * (1 - t);
   } else if (state.activity === 'sleep') bob = -0.6 * Math.max(0, Math.sin(state.age * 2.4));
+  // Electron rejects NaN and out-of-range coordinates. A temporary display
+  // change can make the roaming position invalid; recover on the main screen.
+  if (!Number.isFinite(state.x) || !Number.isFinite(state.y + bob)
+      || Math.abs(state.x) > 1_000_000 || Math.abs(state.y + bob) > 1_000_000) {
+    console.error('Position de la mascotte invalide', {
+      x: state.x, y: state.y, bob, activity: state.activity,
+      age: state.age, duration: state.duration, walkTarget: state.walkTarget
+    });
+    const safeArea = screen.getPrimaryDisplay().workArea;
+    state.x = safeArea.x + (safeArea.width - WIDTH) / 2;
+    state.y = safeArea.y + safeArea.height - HEIGHT - 24;
+    state.vx = 0;
+    state.vy = 0;
+    begin('idle', 1.8);
+    bob = 0;
+  }
   const x = Math.round(state.x);
   const y = Math.round(state.y + bob);
   const previous = window.getPosition();
-  if (previous[0] !== x || previous[1] !== y) window.setPosition(x, y);
+  if (positioningAvailable && (previous[0] !== x || previous[1] !== y)) {
+    try { window.setPosition(x, y); }
+    catch (error) {
+      positioningAvailable = false;
+      console.error('Déplacement de la mascotte désactivé pour cette session', { x, y, error });
+    }
+  }
   window.webContents.send('pet-frame', {
     activity: state.activity, age: state.age, duration: state.duration,
     facingRight: state.facingRight, walkPhase: state.walkPhase,
