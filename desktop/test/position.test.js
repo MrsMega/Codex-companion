@@ -15,7 +15,7 @@ function loadDraw(setPosition) {
     setInterval,
     require(name) {
       if (name === 'electron') return {
-        app: { commandLine: { appendSwitch() {} }, whenReady: () => ({ then() {} }), on() {} },
+        app: { commandLine: { appendSwitch() {} }, disableHardwareAcceleration() {}, whenReady: () => ({ then() {} }), on() {} },
         screen: { getPrimaryDisplay: () => ({ workArea: { x: 0, y: 0, width: 1200, height: 800 } }) }
       };
       if (name === 'electron-updater') return { autoUpdater: {} };
