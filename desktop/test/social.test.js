@@ -8,11 +8,11 @@ function pair() {
   const source = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
   const context = {
     performance,
-    process,
+    process: { platform: 'linux', env: process.env },
     Math: Object.assign(Object.create(Math), { random: () => 0 }),
     require(name) {
       if (name === 'electron') return {
-        app: { whenReady: () => ({ then() {} }), on() {} },
+        app: { disableHardwareAcceleration() {}, whenReady: () => ({ then() {} }), on() {} },
         screen: { getDisplayNearestPoint: () => ({ workArea: { x: 0, y: 0, width: 1200, height: 800 } }) }
       };
       if (name === 'electron-updater') return { autoUpdater: {} };
@@ -85,11 +85,13 @@ test('le menu crée et retire un compagnon avec sa propre fenêtre', () => {
   }
   const workArea = { x: 0, y: 0, width: 1200, height: 800 };
   const context = {
-    performance, process, __dirname: path.join(__dirname, '..'), setInterval: () => 1,
+    performance, process: { platform: 'linux', env: process.env },
+    __dirname: path.join(__dirname, '..'), setInterval: () => 1,
     require(name) {
       if (name === 'electron') return {
         app: {
           isPackaged: false, dock: { hide() {} }, getVersion: () => '2.9.0',
+          disableHardwareAcceleration() {},
           whenReady: () => ({ then(callback) { context.boot = callback; } }), on() {}
         },
         BrowserWindow: FakeWindow,
