@@ -57,6 +57,9 @@ jobs:
       - run: npm run check
       - name: Construire sans publier
         run: npx electron-builder --${{ matrix.platform }} --publish never
+      - name: Vérifier le lancement de l'AppImage publiée
+        if: matrix.platform == 'linux'
+        run: bash scripts/smoke-linux.sh package
 
   prepare-release:
     if: github.ref_type == 'tag'
@@ -107,6 +110,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: npx electron-builder --linux --publish always
+      - name: Vérifier le lancement de l'AppImage publiée
+        if: matrix.platform == 'linux'
+        run: bash scripts/smoke-linux.sh package
       - name: Construire Windows
         if: matrix.platform == 'windows'
         env:

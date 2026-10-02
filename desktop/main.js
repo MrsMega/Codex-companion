@@ -3,10 +3,7 @@ const { autoUpdater } = require('electron-updater');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
-// A roaming desktop pet needs window coordinates. Native Wayland compositors
-// intentionally prohibit apps from positioning their own windows.
 if (process.platform === 'linux') {
-  app.commandLine.appendSwitch('ozone-platform', 'x11');
   // The pet only draws small 2D sprite frames. Avoid GPU driver crashes on
   // Linux desktops and use Electron's software rendering path.
   app.disableHardwareAcceleration();
@@ -336,7 +333,11 @@ app.whenReady().then(() => {
       readyToDraw = true;
       window.showInactive();
       draw();
-      if (process.env.CODEX_SMOKE_TEST === '1') console.log('SPRITES_READY');
+      if (process.env.CODEX_SMOKE_TEST === '1') {
+        console.log('SPRITES_READY');
+        console.log(`OZONE_PLATFORM=${app.commandLine.getSwitchValue('ozone-platform')}`);
+        console.log(`WINDOW_VISIBLE=${window.isVisible()}`);
+      }
     }
     else if (type === 'assets-error') dialog.showErrorBox('Sprites introuvables', 'Les images de Codex Promenade manquent dans cette installation.');
   });
