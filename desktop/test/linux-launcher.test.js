@@ -6,7 +6,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const afterPack = require('../scripts/after-pack.js').default;
 
-test('le lancement Linux transmet X11 avant le démarrage d’Electron', async (t) => {
+test('le lancement Linux transmet X11 avant le démarrage d’Electron', { skip: process.platform === 'win32' }, async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-launcher-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const executable = path.join(dir, 'codex-promenade');

@@ -3,7 +3,7 @@ set -euo pipefail
 
 if [[ "${1:-source}" == 'package' ]]; then
   version="$(node -p "require('./package.json').version")"
-  pet_command=("dist/Codex-Promenade-${version}.AppImage")
+  pet_command=("dist/Codex Promenade-${version}.AppImage")
 else
   # GitHub's temporary runner installs npm files as the unprivileged runner
   # account. Chromium needs its sandbox helper owned by root and setuid.
