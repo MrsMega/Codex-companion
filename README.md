@@ -1,10 +1,11 @@
-# Codex Promenade 2.8
+# Codex Promenade 2.8.1
 
 ## Télécharger et recevoir les mises à jour
 
-Le dépôt GitHub prévu est **[MrsMega/Codex-companion](https://github.com/MrsMega/Codex-companion)**.
-La première publication proposera Windows et Linux. macOS sera ajouté après
-la mise en place de la signature Apple. La page **Releases** proposera alors :
+Le dépôt public est **[MrsMega/Codex-companion](https://github.com/MrsMega/Codex-companion)**.
+La [version 2.8.1](https://github.com/MrsMega/Codex-companion/releases/tag/v2.8.1)
+propose Windows et Linux. macOS sera ajouté après la mise en place de la
+signature Apple. La page **Releases** propose :
 
 | Système | Premier téléchargement | Mises à jour suivantes |
 | --- | --- | --- |
@@ -16,6 +17,9 @@ Les mises à jour sont vérifiées au démarrage puis toutes les six heures.
 Elles viennent des releases publiques GitHub et utilisent les empreintes
 fournies par `electron-builder`. Il faut conserver le même dépôt GitHub après
 la première publication : son adresse est enregistrée dans l'application.
+Sous Fedora Wayland, l'application utilise Xwayland et le rendu logiciel pour
+éviter les plantages du processus GPU. Si la version 2.8.0 reste invisible,
+télécharger et lancer manuellement la version 2.8.1 une fois.
 
 La distribution utilise le code partagé dans `desktop/` avec Electron. La
 version Swift décrite ci-dessous reste le build macOS local. Une installation
@@ -26,11 +30,11 @@ Electron : il faut installer une fois la première release macOS.
 
 1. Installer Node.js 24 et exécuter `cd desktop && npm ci && npm run check`.
    Pour voir l'application localement, lancer `npm start` dans ce dossier.
-2. Créer le dépôt public `MrsMega/Codex-companion` et pousser `main`. La
-   vérification GitHub Actions contrôle le code et la présence des sprites.
+2. Pousser `main` sur le dépôt public `MrsMega/Codex-companion`. La
+   vérification GitHub Actions contrôle le code, les paquets et les sprites.
 3. Pour publier une version, mettre à jour `desktop/package.json` et son
    `package-lock.json`, puis pousser le tag correspondant, par exemple
-   `v2.8.0`. GitHub Actions construit Windows et Linux, crée une release
+   `v2.8.1`. GitHub Actions construit Windows et Linux, crée une release
    brouillon puis la rend publique quand les builds ont réussi.
 4. Pour ajouter macOS aux releases, configurer un certificat Apple Developer
    ID, la notarisation et les secrets GitHub `MAC_CSC_LINK`,
