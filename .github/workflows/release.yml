@@ -32,6 +32,32 @@ jobs:
           test -f ../Resources/codex-spritesheet-v6.webp
           test -f ../Resources/codex-backflip-v3.png
 
+  preflight-packages:
+    if: github.ref_type != 'tag'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: win
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - name: Construire sans publier
+        run: npx electron-builder --${{ matrix.platform }} --publish never
+
   prepare-release:
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest

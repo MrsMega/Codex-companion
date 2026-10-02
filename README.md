@@ -3,7 +3,8 @@
 ## Télécharger et recevoir les mises à jour
 
 Le dépôt GitHub prévu est **[MrsMega/Codex-companion](https://github.com/MrsMega/Codex-companion)**.
-Après la première publication, la page **Releases** proposera :
+La première publication proposera Windows et Linux. macOS sera ajouté après
+la mise en place de la signature Apple. La page **Releases** proposera alors :
 
 | Système | Premier téléchargement | Mises à jour suivantes |
 | --- | --- | --- |
