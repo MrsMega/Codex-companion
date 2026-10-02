@@ -5,7 +5,12 @@ const { pathToFileURL } = require('node:url');
 
 // A roaming desktop pet needs window coordinates. Native Wayland compositors
 // intentionally prohibit apps from positioning their own windows.
-if (process.platform === 'linux') app.commandLine.appendSwitch('ozone-platform', 'x11');
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('ozone-platform', 'x11');
+  // The pet only draws small 2D sprite frames. Avoid GPU driver crashes on
+  // Linux desktops and use Electron's software rendering path.
+  app.disableHardwareAcceleration();
+}
 
 const WIDTH = 96;
 const HEIGHT = 104;

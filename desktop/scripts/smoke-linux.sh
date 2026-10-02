@@ -22,7 +22,7 @@ if ! grep -q '^SPRITES_READY$' "$log_file"; then
   echo 'Les sprites ne se sont pas chargés.' >&2
   exit 1
 fi
-if grep -Eq 'Uncaught Exception|Error processing argument' "$log_file"; then
+if grep -Eq 'Uncaught Exception|Error processing argument|GPU process exited unexpectedly|Failed to send GpuControl.CreateCommandBuffer' "$log_file"; then
   echo 'Exception détectée pendant le test de démarrage.' >&2
   exit 1
 fi
