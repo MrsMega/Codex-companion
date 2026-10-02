@@ -25,6 +25,13 @@ jobs:
           cache-dependency-path: desktop/package-lock.json
       - run: npm ci
       - run: npm run check
+      - name: Vérifier la version commune
+        run: |
+          version=$(node -p "require('./package.json').version")
+          lock_version=$(node -p "require('./package-lock.json').version")
+          mac_version=$(python3 -c "import plistlib; print(plistlib.load(open('../Info.plist', 'rb'))['CFBundleShortVersionString'])")
+          test "$version" = "$lock_version"
+          test "$version" = "$mac_version"
       - name: Démarrage et chargement des sprites sous X11 virtuel
         run: bash scripts/smoke-linux.sh
       - name: Vérifier les sprites
@@ -42,6 +49,8 @@ jobs:
             platform: linux
           - os: windows-latest
             platform: win
+          - os: macos-latest
+            platform: mac
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -56,6 +65,8 @@ jobs:
       - run: npm ci
       - run: npm run check
       - name: Construire sans publier
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npx electron-builder --${{ matrix.platform }} --publish never
       - name: Vérifier le lancement de l'AppImage publiée
         if: matrix.platform == 'linux'
@@ -70,7 +81,25 @@ jobs:
         shell: bash
         run: |
           version=$(node -p "require('./desktop/package.json').version")
+          lock_version=$(node -p "require('./desktop/package-lock.json').version")
+          mac_version=$(python3 -c "import plistlib; print(plistlib.load(open('Info.plist', 'rb'))['CFBundleShortVersionString'])")
           test "${GITHUB_REF_NAME}" = "v${version}"
+          test "$version" = "$lock_version"
+          test "$version" = "$mac_version"
+      - name: Vérifier la publication sur les trois systèmes
+        shell: bash
+        env:
+          MAC_RELEASE_READY: ${{ vars.MAC_RELEASE_READY }}
+          MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          MAC_CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [[ "$MAC_RELEASE_READY" != true || -z "$MAC_CSC_LINK" || -z "$MAC_CSC_KEY_PASSWORD" || -z "$APPLE_ID" || -z "$APPLE_APP_SPECIFIC_PASSWORD" || -z "$APPLE_TEAM_ID" ]]; then
+            echo 'La publication nécessite la signature et la notarisation macOS pour livrer Linux, Windows et macOS ensemble.' >&2
+            exit 1
+          fi
       - name: Créer une release brouillon
         env:
           GH_TOKEN: ${{ github.token }}
@@ -121,7 +150,7 @@ jobs:
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
         run: npx electron-builder --win --publish always
       - name: Construire macOS signé et notarisé
-        if: matrix.platform == 'mac' && vars.MAC_RELEASE_READY == 'true'
+        if: matrix.platform == 'mac'
         env:
           GH_TOKEN: ${{ github.token }}
           CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
@@ -140,4 +169,13 @@ jobs:
       - name: Publier la release et activer les mises à jour
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release edit "$GITHUB_REF_NAME" --draft=false
+        shell: bash
+        run: |
+          assets=$(gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[].name')
+          for pattern in '\.AppImage$' '\.exe$' '\.dmg$' '\.zip$' '^latest-linux.yml$' '^latest.yml$' '^latest-mac.yml$'; do
+            if ! grep -Eq "$pattern" <<< "$assets"; then
+              echo "Paquet ou métadonnées de mise à jour manquants : $pattern" >&2
+              exit 1
+            fi
+          done
+          gh release edit "$GITHUB_REF_NAME" --draft=false

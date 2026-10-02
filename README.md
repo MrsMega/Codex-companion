@@ -1,11 +1,14 @@
-# Codex Promenade 2.8.1
+# Codex Promenade
 
 ## Télécharger et recevoir les mises à jour
 
 Le dépôt public est **[MrsMega/Codex-companion](https://github.com/MrsMega/Codex-companion)**.
-La [version 2.8.1](https://github.com/MrsMega/Codex-companion/releases/tag/v2.8.1)
-propose Windows et Linux. macOS sera ajouté après la mise en place de la
-signature Apple. La page **Releases** propose :
+La [page Releases](https://github.com/MrsMega/Codex-companion/releases)
+regroupe les téléchargements. La version 2.9.0 est préparée avec le même code
+Electron et les mêmes animations pour Linux, macOS et Windows. La publication
+est bloquée tant que les trois paquets et leurs métadonnées de mise à jour ne
+sont pas disponibles. La dernière version publiée sans macOS est
+[2.8.2](https://github.com/MrsMega/Codex-companion/releases/tag/v2.8.2).
 
 | Système | Premier téléchargement | Mises à jour suivantes |
 | --- | --- | --- |
@@ -13,13 +16,13 @@ signature Apple. La page **Releases** propose :
 | Linux X11/Xwayland | Fichier `.AppImage` à rendre exécutable | Téléchargées en arrière-plan, installées à la fermeture ou via le menu |
 | macOS | `.dmg` signé et notarisé | Téléchargées en arrière-plan, installées à la fermeture ou via le menu |
 
-Les mises à jour sont vérifiées au démarrage puis toutes les six heures.
+Les mises à jour sont vérifiées peu après le démarrage puis toutes les six heures.
 Elles viennent des releases publiques GitHub et utilisent les empreintes
 fournies par `electron-builder`. Il faut conserver le même dépôt GitHub après
 la première publication : son adresse est enregistrée dans l'application.
 Sous Fedora Wayland, l'application utilise Xwayland et le rendu logiciel pour
 éviter les plantages du processus GPU. Si la version 2.8.0 reste invisible,
-télécharger et lancer manuellement la version 2.8.1 une fois.
+télécharger et lancer manuellement une version plus récente une fois.
 
 La distribution utilise le code partagé dans `desktop/` avec Electron. La
 version Swift décrite ci-dessous reste le build macOS local. Une installation
@@ -34,14 +37,16 @@ Electron : il faut installer une fois la première release macOS.
    vérification GitHub Actions contrôle le code, les paquets et les sprites.
 3. Pour publier une version, mettre à jour `desktop/package.json` et son
    `package-lock.json`, puis pousser le tag correspondant, par exemple
-   `v2.8.1`. GitHub Actions construit Windows et Linux, crée une release
-   brouillon puis la rend publique quand les builds ont réussi.
-4. Pour ajouter macOS aux releases, configurer un certificat Apple Developer
+   `v2.9.0`. GitHub Actions construit Linux, Windows et macOS, crée une release
+   brouillon puis la rend publique seulement après vérification des trois
+   paquets et des fichiers de mise à jour.
+4. Avant de pousser le tag, configurer un certificat Apple Developer
    ID, la notarisation et les secrets GitHub `MAC_CSC_LINK`,
    `MAC_CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` et
    `APPLE_TEAM_ID`. Définir ensuite la variable GitHub Actions
-   `MAC_RELEASE_READY=true`. Sans ces éléments, le build macOS de publication
-   est ignoré afin de ne pas distribuer une application bloquée par Gatekeeper.
+   `MAC_RELEASE_READY=true`. Sans ces éléments, la publication entière échoue
+   avant la création de la release pour éviter des versions différentes selon
+   le système.
    Un certificat Windows facultatif se configure avec `WIN_CSC_LINK` et
    `WIN_CSC_KEY_PASSWORD` ; sans lui Windows peut afficher un avertissement.
 
@@ -75,7 +80,7 @@ se compile avec `swiftc` et les frameworks fournis par macOS.
 - `validate-sprites.swift` : vérification des dimensions, couleurs et tailles
   avant chaque reconstruction de l'application.
 - `AGENTS.md` : consignes pour conserver la cohérence des prochains sprites.
-- `make-icon.swift` : dessin vectoriel de l'icône et génération du fichier `.icns`.
+- `make-icon.swift` : dessin vectoriel de l'icône et génération des fichiers `.icns`, `.ico` et `.png` pour macOS, Windows et Linux.
 - `Info.plist` : nom, version, identifiant et configuration de l'application.
 - `build.sh` : reconstruction locale de l'application.
 
@@ -87,12 +92,23 @@ seconde met à jour les positions et choisit la pose correspondant à l'action.
 Les actions sont des états : marche, pause, réflexion, choc, salut, salto,
 émotions, regard, repos, sommeil, portage et chute. Les trajets, durées et actions sont choisis
 avec une part d'aléatoire. La pose de marche dépend de la distance parcourue
-pour limiter le glissement des pieds.
+pour limiter le glissement des pieds. Les trajets restent parfois horizontaux
+et peuvent aussi monter et descendre dans la zone visible de l'écran. Le
+compagnon garde son animation de marche pendant ces déplacements et sa
+position en hauteur à l'arrêt.
 
 Le compagnon s'assoit de temps à autre pendant quelques secondes. Plus rarement,
 il ferme les yeux et dort un peu plus longtemps, avec une légère respiration.
 Une nouvelle interaction peut le réveiller. Le menu contextuel permet aussi de
 déclencher immédiatement les poses « Se reposer » et « Dormir ».
+
+Le menu contextuel permet d'ajouter jusqu'à six compagnons et de retirer celui
+sur lequel on clique. Deux compagnons proches, à la même hauteur, peuvent se
+saluer en se touchant les mains puis danser, discuter à tour de rôle, faire des
+saltos alternés ou rire ensemble. La commande « Faire une activité à deux »
+déclenche une de ces nouvelles scènes avec un voisin. Leurs animations commencent
+au même moment, puis une pause évite que la scène se répète sans arrêt. Porter
+ou commander l'un des deux interrompt leur interaction commune.
 
 Un clic droit, y compris dans une autre application, déclenche une courte
 réaction de curiosité. Un clic droit sur la mascotte ouvre aussi ses commandes.

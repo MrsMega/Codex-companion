@@ -23,16 +23,18 @@ function loadDraw(setPosition) {
     }
   };
   vm.runInNewContext(`${source}\n` +
-    `globalThis.hooks = {
-      state, draw,
+    `const pet = createPet(null, true);
+    globalThis.hooks = {
+      state: pet.state, draw: pet.draw,
       ready() {
-        readyToDraw = true;
-        window = {
+        pet.attachWindow({
           isDestroyed: () => false,
           getPosition: () => [0, 0],
           setPosition: globalThis.recordPosition,
+          showInactive() {},
           webContents: { send() {} }
-        };
+        });
+        pet.assetsReady();
       }
     };`, context);
   context.recordPosition = (x, y) => {

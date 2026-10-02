@@ -10,6 +10,7 @@ private let landingDuration = 1.42
 
 final class PetView: NSView {
     var image: NSImage? { didSet { needsDisplay = true } }
+    var mirrorImage = false { didSet { if mirrorImage != oldValue { needsDisplay = true } } }
     // -1 hides the hands; 0 rests on the keys; 1/2 press left/right.
     var typingPose = -1 { didSet { if typingPose != oldValue { needsDisplay = true } } }
     var onPickUp: (() -> Void)?
@@ -24,7 +25,17 @@ final class PetView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         guard let image else { return }
         NSGraphicsContext.current?.imageInterpolation = .none
-        image.draw(in: bounds, from: .zero, operation: .sourceOver, fraction: 1)
+        if mirrorImage {
+            NSGraphicsContext.saveGraphicsState()
+            let transform = NSAffineTransform()
+            transform.translateX(by: bounds.width, yBy: 0)
+            transform.scaleX(by: -1, yBy: 1)
+            transform.concat()
+            image.draw(in: bounds, from: .zero, operation: .sourceOver, fraction: 1)
+            NSGraphicsContext.restoreGraphicsState()
+        } else {
+            image.draw(in: bounds, from: .zero, operation: .sourceOver, fraction: 1)
+        }
         if typingPose >= 0 { drawTypingHands() }
     }
 
@@ -86,7 +97,20 @@ final class PetView: NSView {
 }
 
 final class PetController: NSObject, NSApplicationDelegate {
-    private enum Activity { case idle, walk, think, wait, look, wave, jump, backflip, review, bump, laugh, surprise, pout, context, selection, rest, sleep, attend, carried, falling, land }
+    private enum Activity {
+        case idle, walk, think, wait, look, wave, jump, backflip, review, bump, laugh
+        case surprise, pout, context, selection, rest, sleep, attend, carried, falling, land
+        case handshake, dance, conversation, duoFlip, sharedLaugh
+
+        var isSocial: Bool {
+            switch self {
+            case .handshake, .dance, .conversation, .duoFlip, .sharedLaugh: true
+            default: false
+            }
+        }
+    }
+    private static var companions: [PetController] = []
+    private static let companionLimit = 6
     private struct DragSample {
         let position: NSPoint
         let time: Double
@@ -138,11 +162,15 @@ final class PetController: NSObject, NSApplicationDelegate {
     private var x = 0.0
     private var y = 0.0
     private var walkTarget = 0.0
+    private var walkTargetY = 0.0
     private var walkSpeed = 0.0
     private var walkMaxSpeed = 56.0
     private var walkAnimationPhase = 0.0
     private var headingForEdge = false
     private var impactX = 0.0
+    private weak var socialPartner: PetController?
+    private var nextSocialAt = 0.0
+    private var nextSocialCheckAt = 0.0
     private var idleFrames: [NSImage] = []
     private var rightFrames: [NSImage] = []
     private var leftFrames: [NSImage] = []
@@ -165,6 +193,10 @@ final class PetController: NSObject, NSApplicationDelegate {
     private var sleepFrames: [NSImage] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        launch(near: nil)
+    }
+
+    private func launch(near neighbor: PetController?) {
         NSApp.setActivationPolicy(.accessory)
         guard loadSprites() else {
             let alert = NSAlert()
@@ -175,9 +207,27 @@ final class PetController: NSObject, NSApplicationDelegate {
             return
         }
 
-        let screen = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1200, height: 800)
-        x = Double(screen.midX - petSize.width / 2)
-        y = Double(screen.minY + 24)
+        let screen = neighbor?.currentScreenFrame()
+            ?? NSScreen.main?.visibleFrame
+            ?? NSRect(x: 0, y: 0, width: 1200, height: 800)
+        if let neighbor {
+            let minX = Double(screen.minX)
+            let maxX = Double(screen.maxX - petSize.width)
+            let candidates = [78.0, -78.0, 156.0, -156.0, 234.0, -234.0]
+                .map { min(maxX, max(minX, neighbor.x + $0)) }
+            let nearby = PetController.companions.filter { abs($0.y - neighbor.y) <= 35 }
+            func clearance(_ candidate: Double) -> Double {
+                nearby.map { abs(candidate - $0.x) }.min() ?? .infinity
+            }
+            x = candidates.first(where: { clearance($0) >= 58 })
+                ?? candidates.max(by: { clearance($0) < clearance($1) })
+                ?? neighbor.x
+            y = neighbor.y
+            firstJourney = false
+        } else {
+            x = Double(screen.midX - petSize.width / 2)
+            y = Double(screen.minY + 24)
+        }
         window = NSWindow(contentRect: NSRect(origin: NSPoint(x: x, y: y), size: petSize),
                           styleMask: .borderless, backing: .buffered, defer: false)
         window.backgroundColor = .clear
@@ -198,6 +248,7 @@ final class PetController: NSObject, NSApplicationDelegate {
         view.onOpen = { [weak self] in self?.openChatGPT() }
         window.contentView = view
         window.orderFrontRegardless()
+        PetController.companions.append(self)
 
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
@@ -211,6 +262,13 @@ final class PetController: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        for companion in PetController.companions { companion.stop() }
+    }
+
+    private func stop() {
+        if let partner = socialPartner { partner.begin(.idle, duration: 0.6) }
+        timer?.invalidate()
+        timer = nil
         if let globalClickMonitor { NSEvent.removeMonitor(globalClickMonitor) }
         if let globalSelectionMonitor { NSEvent.removeMonitor(globalSelectionMonitor) }
         if let globalKeyMonitor { NSEvent.removeMonitor(globalKeyMonitor) }
@@ -218,6 +276,7 @@ final class PetController: NSObject, NSApplicationDelegate {
             NSWorkspace.shared.notificationCenter.removeObserver(activationObserver)
         }
         if let screenObserver { NotificationCenter.default.removeObserver(screenObserver) }
+        window?.close()
     }
 
     private func installAttentionMonitoring() {
@@ -678,6 +737,10 @@ final class PetController: NSObject, NSApplicationDelegate {
             let recoil = 14.0 * (1.0 - pow(1.0 - progress, 3.0))
             x = impactX - (facingRight ? recoil : -recoil)
         }
+        if now >= nextSocialCheckAt {
+            nextSocialCheckAt = now + 0.25
+            lookForCompanion(at: now)
+        }
         if activityAge >= activityDuration { finishActivity() }
         render()
     }
@@ -704,8 +767,9 @@ final class PetController: NSObject, NSApplicationDelegate {
         x = min(bounds.max, max(bounds.min, x))
         let ground = Double(screen.minY + 24)
         let ceiling = max(ground, Double(screen.maxY - petSize.height + 12))
-        y = activity == .falling ? min(ceiling, max(ground, y)) : ground
+        y = min(ceiling, max(ground, y))
         walkTarget = min(bounds.max, max(bounds.min, walkTarget))
+        walkTargetY = min(ceiling, max(ground, walkTargetY))
         impactX = x
         render()
     }
@@ -725,14 +789,92 @@ final class PetController: NSObject, NSApplicationDelegate {
     }
 
     private func begin(_ next: Activity, duration: Double) {
+        if let partner = socialPartner, !next.isSocial {
+            socialPartner = nil
+            partner.socialPartner = nil
+            if partner.activity.isSocial {
+                partner.begin(.idle, duration: 0.6)
+            }
+        }
         activity = next
         activityAge = 0
         activityDuration = duration
         if next != .walk { walkSpeed = 0 }
     }
 
+    private var canSocialize: Bool {
+        guard !paused, socialPartner == nil else { return false }
+        switch activity {
+        case .idle, .walk, .think, .wait, .look, .wave, .laugh, .review:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func lookForCompanion(at now: Double) {
+        guard now >= nextSocialAt, canSocialize else { return }
+        let neighbors = PetController.companions.filter { companion in
+            companion !== self && companion.canSocialize && now >= companion.nextSocialAt
+                && abs(companion.y - y) <= 22
+                && (55...125).contains(abs(companion.x - x))
+        }
+        guard let partner = neighbors.min(by: { abs($0.x - x) < abs($1.x - x) }) else { return }
+        let closeEnoughToTouch = abs(partner.x - x) <= 96 && abs(partner.y - y) <= 14
+        let kinds: [Activity] = closeEnoughToTouch
+            ? [.handshake, .dance, .conversation, .duoFlip, .sharedLaugh]
+            : [.dance, .conversation, .duoFlip, .sharedLaugh]
+        let kind = kinds.randomElement() ?? .conversation
+        startSocial(with: partner, kind: kind, at: now)
+    }
+
+    private func startSocial(with partner: PetController, kind: Activity, at now: Double) {
+        guard canSocialize, partner.canSocialize else { return }
+        let duration: Double
+        switch kind {
+        case .handshake: duration = 2.25
+        case .dance: duration = 3.6
+        case .conversation: duration = 3.2
+        case .duoFlip: duration = 3.0
+        case .sharedLaugh: duration = 1.75
+        default: return
+        }
+        firstJourney = false
+        partner.firstJourney = false
+        facingRight = x < partner.x
+        partner.facingRight = !facingRight
+        socialPartner = partner
+        partner.socialPartner = self
+        nextSocialAt = now + Double.random(in: 18...28)
+        partner.nextSocialAt = now + Double.random(in: 18...28)
+        begin(kind, duration: duration)
+        partner.begin(kind, duration: duration)
+        partner.render()
+    }
+
+    private func continueSocial(as next: Activity, duration: Double) {
+        guard let partner = socialPartner, partner.activity == activity else {
+            startWalk()
+            return
+        }
+        begin(next, duration: duration)
+        partner.begin(next, duration: duration)
+        partner.render()
+    }
+
+    private func nearestAvailableCompanion() -> PetController? {
+        PetController.companions.filter {
+            $0 !== self && $0.canSocialize
+                && abs($0.y - y) <= 22
+                && (55...125).contains(abs($0.x - x))
+        }.min(by: { abs($0.x - x) < abs($1.x - x) })
+    }
+
     private func startWalk() {
         let bounds = currentBounds()
+        let ground = currentGroundY()
+        let ceiling = max(ground, currentCeilingY())
+        let wasFirstJourney = firstJourney
         let direction = forcedDirection ?? Bool.random()
         forcedDirection = nil
         facingRight = direction
@@ -753,6 +895,12 @@ final class PetController: NSObject, NSApplicationDelegate {
             walkTarget = x + (facingRight ? 100 : -100)
             walkTarget = min(bounds.max, max(bounds.min, walkTarget))
         }
+        walkTargetY = y
+        if !wasFirstJourney && ceiling - ground >= 90 && Double.random(in: 0...1) < 0.5 {
+            let climb = y <= ground + 50 ? true : y >= ceiling - 50 ? false : Bool.random()
+            let distance = Double.random(in: 110...230)
+            walkTargetY = min(ceiling, max(ground, y + (climb ? distance : -distance)))
+        }
         consecutiveActions = 0
         walkAnimationPhase = 0
         begin(.walk, duration: 120)
@@ -760,24 +908,29 @@ final class PetController: NSObject, NSApplicationDelegate {
 
     private func move(dt: Double) {
         let bounds = currentBounds()
-        let sign = facingRight ? 1.0 : -1.0
-        let remaining = max(0.0, (walkTarget - x) * sign)
+        let dx = walkTarget - x
+        let dy = walkTargetY - y
+        let remaining = hypot(dx, dy)
         let brakingSpeed = headingForEdge ? walkMaxSpeed : sqrt(2.0 * 105.0 * remaining)
         let desiredSpeed = min(walkMaxSpeed, brakingSpeed)
         walkSpeed += (desiredSpeed - walkSpeed) * (1.0 - exp(-dt * 6.5))
-        let step = headingForEdge ? walkSpeed * dt : min(walkSpeed * dt, remaining)
-        x += sign * step
+        let step = min(walkSpeed * dt, remaining)
+        if remaining > 0 {
+            x += dx / remaining * step
+            y += dy / remaining * step
+        }
         // Eight ordered poses span roughly 40 points. Advancing with distance
         // keeps the feet in sync as the companion accelerates and brakes.
-        walkAnimationPhase += abs(step) * (8.0 / 40.0)
+        walkAnimationPhase += step * (8.0 / 40.0)
 
-        if x <= bounds.min || x >= bounds.max {
+        if headingForEdge && (x <= bounds.min + 0.001 || x >= bounds.max - 0.001) {
             x = min(bounds.max, max(bounds.min, x))
             impactX = x
             forcedDirection = !facingRight
             begin(.bump, duration: 0.9)
-        } else if abs(walkTarget - x) < 3.0 && walkSpeed < 10.0 {
+        } else if hypot(walkTarget - x, walkTargetY - y) < 3.0 && walkSpeed < 10.0 {
             x = walkTarget
+            y = walkTargetY
             chooseAction()
         }
     }
@@ -848,6 +1001,12 @@ final class PetController: NSObject, NSApplicationDelegate {
         case .attend:
             attentionTyping = false
             startWalk()
+        case .handshake:
+            continueSocial(as: .dance, duration: 3.6)
+        case .conversation, .duoFlip:
+            continueSocial(as: .sharedLaugh, duration: 1.75)
+        case .dance, .sharedLaugh:
+            startWalk()
         case .land, .falling:
             startWalk()
         case .carried:
@@ -865,6 +1024,8 @@ final class PetController: NSObject, NSApplicationDelegate {
         let frames: [NSImage]
         let index: Int
         var bob = 0.0
+        var sway = 0.0
+        var mirrorImage = false
         var typingPose = -1
         switch activity {
         case .idle:
@@ -881,6 +1042,43 @@ final class PetController: NSObject, NSApplicationDelegate {
             index = min(frames.count - 1, Int(activityAge / activityDuration * Double(frames.count)))
         case .wave:
             frames = waveFrames; index = Int(activityAge * 7.0) % frames.count
+        case .handshake:
+            frames = waveFrames
+            index = [0, 1, 1, 1, 2, 1, 1, 3][Int(activityAge * 6.0) % 8]
+            bob = 1.5 * abs(sin(activityAge * 9.0))
+            mirrorImage = facingRight
+        case .dance:
+            frames = jumpFrames
+            index = [0, 1, 2, 2, 3, 4, 0, 1, 2, 3][Int(activityAge * 7.0) % 10]
+            bob = 7.0 * abs(sin(activityAge * 10.0))
+            sway = 3.0 * sin(activityAge * 6.0) * (facingRight ? 1 : -1)
+        case .conversation:
+            let speaking = (Int(activityAge / 0.8).isMultiple(of: 2)) == facingRight
+            if speaking {
+                frames = waveFrames
+                index = Int(activityAge * 7.0) % frames.count
+                mirrorImage = facingRight
+                bob = 1.2 * abs(sin(activityAge * 8.0))
+            } else {
+                frames = lookFrames
+                index = facingRight ? 3 : 14
+            }
+        case .duoFlip:
+            let start = facingRight ? 0.2 : 1.5
+            let t = (activityAge - start) / 1.15
+            if (0..<1).contains(t) {
+                frames = backflipFrames
+                index = min(frames.count - 1, Int(t * Double(frames.count)))
+                bob = 46.0 * 4.0 * t * (1.0 - t)
+            } else {
+                frames = waveFrames
+                index = Int(activityAge * 6.0) % frames.count
+                mirrorImage = facingRight
+            }
+        case .sharedLaugh:
+            frames = laughFrames
+            index = min(frames.count - 1, Int(activityAge / activityDuration * Double(frames.count)))
+            bob = 2.5 * abs(sin(activityAge * 12.0))
         case .jump:
             frames = jumpFrames
             index = min(frames.count - 1, Int(activityAge / activityDuration * Double(frames.count)))
@@ -951,14 +1149,16 @@ final class PetController: NSObject, NSApplicationDelegate {
             default: index = 5 // stands before walking
             }
         }
-        window.setFrameOrigin(NSPoint(x: x, y: y + bob))
+        window.setFrameOrigin(NSPoint(x: x + sway, y: y + bob))
         view.typingPose = typingPose
+        view.mirrorImage = mirrorImage
         view.image = frames[index]
     }
 
     private func showMenu() {
         let menu = NSMenu()
-        let versionItem = NSMenuItem(title: "Codex Promenade 2.8", action: nil, keyEquivalent: "")
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        let versionItem = NSMenuItem(title: "Codex Promenade \(version)", action: nil, keyEquivalent: "")
         versionItem.isEnabled = false
         if let iconURL = Bundle.main.url(forResource: "CodexPromenade-icon", withExtension: "png"),
            let icon = NSImage(contentsOf: iconURL) {
@@ -966,6 +1166,15 @@ final class PetController: NSObject, NSApplicationDelegate {
             versionItem.image = icon
         }
         menu.addItem(versionItem)
+        menu.addItem(NSMenuItem.separator())
+        let addCompanion = menu.addItem(withTitle: "Ajouter un compagnon", action: #selector(addCompanion), keyEquivalent: "")
+        addCompanion.isEnabled = PetController.companions.count < PetController.companionLimit
+        if PetController.companions.count > 1 {
+            menu.addItem(withTitle: "Retirer ce compagnon", action: #selector(removeCompanion), keyEquivalent: "")
+        }
+        let together = menu.addItem(withTitle: "Faire une activité à deux", action: #selector(triggerTogether), keyEquivalent: "")
+        together.isEnabled = nearestAvailableCompanion() != nil
+            && activity != .carried && activity != .falling && activity != .land
         menu.addItem(NSMenuItem.separator())
         menu.addItem(withTitle: "Faire un salto arrière", action: #selector(triggerBackflip), keyEquivalent: "")
         menu.addItem(withTitle: "Saluer", action: #selector(triggerWave), keyEquivalent: "")
@@ -1038,12 +1247,48 @@ final class PetController: NSObject, NSApplicationDelegate {
         nextRestAt = ProcessInfo.processInfo.systemUptime + Double.random(in: 65...110)
         begin(.sleep, duration: 14)
     }
+    @objc private func addCompanion() {
+        guard PetController.companions.count < PetController.companionLimit else { return }
+        if activity == .context { begin(.idle, duration: 0.6) }
+        let companion = PetController()
+        companion.launch(near: self)
+        let now = ProcessInfo.processInfo.systemUptime
+        let neighbors = PetController.companions.filter {
+            $0 !== companion && $0.canSocialize
+                && abs($0.y - companion.y) <= 14
+                && (55...125).contains(abs($0.x - companion.x))
+        }
+        if let nearest = neighbors.min(by: {
+            abs($0.x - companion.x) < abs($1.x - companion.x)
+        }) {
+            nearest.startSocial(with: companion, kind: .handshake, at: now)
+        }
+    }
+    @objc private func removeCompanion() {
+        guard PetController.companions.count > 1 else { return }
+        stop()
+        PetController.companions.removeAll { $0 === self }
+    }
+    @objc private func triggerTogether() {
+        guard activity != .carried && activity != .falling && activity != .land else { return }
+        paused = false
+        firstJourney = false
+        if !canSocialize { begin(.idle, duration: 0.6) }
+        guard let partner = nearestAvailableCompanion() else { return }
+        let kind: Activity = [.conversation, .duoFlip, .sharedLaugh].randomElement() ?? .conversation
+        startSocial(with: partner, kind: kind, at: ProcessInfo.processInfo.systemUptime)
+    }
     @objc private func toggleAttention() {
         attentionEnabled.toggle()
         if !attentionEnabled && activity == .attend { startWalk() }
         if attentionEnabled { handleApplicationActivation() }
     }
-    @objc private func togglePause() { paused.toggle() }
+    @objc private func togglePause() {
+        if !paused && activity.isSocial {
+            begin(.idle, duration: 0.6)
+        }
+        paused.toggle()
+    }
     @objc private func openChatGPT() {
         let systemFallback = URL(fileURLWithPath: "/Applications/ChatGPT.app")
         let userFallback = FileManager.default.homeDirectoryForCurrentUser

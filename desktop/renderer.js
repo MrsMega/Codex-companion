@@ -71,6 +71,19 @@ function frameFor(state) {
     case 'wait': return cell('atlas', 6, seq(5, 6));
     case 'look': return cell('atlas', 9 + Math.floor(once(16) / 8), once(16) % 8);
     case 'wave': return cell('atlas', 3, seq(7, 4));
+    case 'handshake': return cell('atlas', 3, [0, 1, 1, 1, 2, 1, 1, 3][seq(6, 8)]);
+    case 'dance': return cell('atlas', 4, [0, 1, 2, 2, 3, 4, 0, 1, 2, 3][seq(7, 10)]);
+    case 'conversation': return (Math.floor(age / 0.8) % 2 === 0) === facingRight
+      ? cell('atlas', 3, seq(7, 4))
+      : cell('atlas', facingRight ? 9 : 10, facingRight ? 3 : 6);
+    case 'duoFlip': {
+      const start = facingRight ? 0.2 : 1.5;
+      const t = (age - start) / 1.15;
+      if (t < 0 || t >= 1) return cell('atlas', 3, seq(6, 4));
+      const index = Math.min(9, Math.floor(t * 10));
+      return index === 0 || index === 9 ? cell('atlas', 0, 0) : cell('backflip', 0, index - 1);
+    }
+    case 'sharedLaugh': return cell('laugh', 0, once(6));
     case 'jump': return cell('atlas', 4, once(5));
     case 'backflip': {
       const index = once(10);
@@ -93,5 +106,11 @@ window.pet.onFrame((state) => {
   if (!images.atlas) return;
   const [image, sx, sy] = frameFor(state);
   context.clearRect(0, 0, 192, 208);
+  if (state.mirrorImage) {
+    context.save();
+    context.translate(192, 0);
+    context.scale(-1, 1);
+  }
   context.drawImage(image, sx, sy, 192, 208, 0, 0, 192, 208);
+  if (state.mirrorImage) context.restore();
 });

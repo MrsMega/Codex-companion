@@ -1,6 +1,6 @@
 import AppKit
 
-// Rebuild the macOS app icon with: swift make-icon.swift
+// Rebuild the macOS and Windows app icons with: swift make-icon.swift
 // The artwork is vector-drawn at 1024 px, then packaged at the standard sizes.
 let project = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 let resources = project.appendingPathComponent("Resources", isDirectory: true)
@@ -120,7 +120,8 @@ let master = resources.appendingPathComponent("CodexPromenade-icon.png")
 try png.write(to: master)
 
 let variants: [(String, Int)] = [
-    ("icon_16x16.png", 16), ("icon_16x16@2x.png", 32),
+    ("icon_16x16.png", 16), ("icon_24x24.png", 24), ("icon_48x48.png", 48),
+    ("icon_16x16@2x.png", 32), ("icon_64x64.png", 64),
     ("icon_32x32.png", 32), ("icon_32x32@2x.png", 64),
     ("icon_128x128.png", 128), ("icon_128x128@2x.png", 256),
     ("icon_256x256.png", 256), ("icon_256x256@2x.png", 512),
@@ -162,3 +163,36 @@ archive.append(bigEndian(UInt32(payload.count + 8)))
 archive.append(payload)
 try archive.write(to: icon)
 print("Icône créée : \(icon.path)")
+
+func littleEndian(_ value: UInt16) -> Data {
+    withUnsafeBytes(of: value.littleEndian) { Data($0) }
+}
+func littleEndian(_ value: UInt32) -> Data {
+    withUnsafeBytes(of: value.littleEndian) { Data($0) }
+}
+
+// Windows picks a frame that matches the display scale from this ICO resource.
+let windowsSizes = [16, 24, 32, 48, 64, 128, 256]
+let windowsImages = try windowsSizes.map { size in
+    let name = "icon_\(size)x\(size).png"
+    return try Data(contentsOf: iconset.appendingPathComponent(name))
+}
+var windowsIcon = Data()
+windowsIcon.append(littleEndian(UInt16(0)))
+windowsIcon.append(littleEndian(UInt16(1)))
+windowsIcon.append(littleEndian(UInt16(windowsImages.count)))
+var imageOffset = UInt32(6 + windowsImages.count * 16)
+for (size, bytes) in zip(windowsSizes, windowsImages) {
+    windowsIcon.append(UInt8(size == 256 ? 0 : size))
+    windowsIcon.append(UInt8(size == 256 ? 0 : size))
+    windowsIcon.append(contentsOf: [0, 0])
+    windowsIcon.append(littleEndian(UInt16(1)))
+    windowsIcon.append(littleEndian(UInt16(32)))
+    windowsIcon.append(littleEndian(UInt32(bytes.count)))
+    windowsIcon.append(littleEndian(imageOffset))
+    imageOffset += UInt32(bytes.count)
+}
+for bytes in windowsImages { windowsIcon.append(bytes) }
+let windowsIconURL = resources.appendingPathComponent("CodexPromenade.ico")
+try windowsIcon.write(to: windowsIconURL)
+print("Icône créée : \(windowsIconURL.path)")
