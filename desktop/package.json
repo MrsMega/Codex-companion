@@ -18,25 +18,65 @@
     "electron-updater": "6.8.10"
   },
   "devDependencies": {
-    "electron": "44.4.3",
+    "electron": "44.5.1",
     "electron-builder": "26.17.0"
   },
   "build": {
     "appId": "fr.mrsmega.codexpromenade",
     "productName": "Codex Promenade",
     "asar": true,
-    "files": ["main.js", "preload.js", "renderer.js", "index.html", "package.json"],
-    "extraResources": [{"from": "../Resources", "to": "sprites", "filter": ["*.png", "*.webp", "*.icns"]}],
-    "directories": {"output": "dist"},
-    "publish": {"provider": "github", "owner": "MrsMega", "repo": "Codex-companion"},
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer.js",
+      "index.html",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../Resources",
+        "to": "sprites",
+        "filter": [
+          "*.png",
+          "*.webp",
+          "*.icns"
+        ]
+      }
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "MrsMega",
+      "repo": "Codex-companion"
+    },
     "mac": {
       "category": "public.app-category.entertainment",
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "icon": "../Resources/CodexPromenade.icns",
       "hardenedRuntime": true
     },
-    "win": {"target": ["nsis"], "icon": "../Resources/CodexPromenade-icon.png"},
-    "nsis": {"oneClick": true, "perMachine": false, "allowElevation": false},
-    "linux": {"target": ["AppImage"], "category": "Game", "icon": "../Resources/CodexPromenade-icon.png"}
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "../Resources/CodexPromenade-icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": false
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Game",
+      "icon": "../Resources/CodexPromenade-icon.png"
+    }
   }
 }
