@@ -1,0 +1,106 @@
+name: Construire et publier
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    if: github.ref_type != 'tag'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - name: Vérifier les sprites
+        run: |
+          test -f ../Resources/codex-spritesheet-v6.webp
+          test -f ../Resources/codex-backflip-v3.png
+
+  prepare-release:
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Vérifier la version
+        shell: bash
+        run: |
+          version=$(node -p "require('./desktop/package.json').version")
+          test "${GITHUB_REF_NAME}" = "v${version}"
+      - name: Créer une release brouillon
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --draft --title "Codex Promenade $GITHUB_REF_NAME" --generate-notes
+
+  build-release:
+    if: github.ref_type == 'tag'
+    needs: prepare-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            os: ubuntu-latest
+          - platform: windows
+            os: windows-latest
+          - platform: mac
+            os: macos-latest
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - name: Construire Linux
+        if: matrix.platform == 'linux'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npx electron-builder --linux --publish always
+      - name: Construire Windows
+        if: matrix.platform == 'windows'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: npx electron-builder --win --publish always
+      - name: Construire macOS signé et notarisé
+        if: matrix.platform == 'mac' && vars.MAC_RELEASE_READY == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npx electron-builder --mac --publish always --config.mac.forceCodeSigning=true
+
+  publish-release:
+    if: github.ref_type == 'tag'
+    needs: build-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publier la release et activer les mises à jour
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$GITHUB_REF_NAME" --draft=false

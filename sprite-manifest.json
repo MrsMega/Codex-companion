@@ -1,0 +1,15 @@
+{
+  "sprites": [
+    { "file": "codex-laugh-v3.png", "frames": 6, "pose": "standing" },
+    { "file": "codex-surprise-v3.png", "frames": 6, "pose": "standing" },
+    { "file": "codex-pout-v3.png", "frames": 6, "pose": "standing" },
+    { "file": "codex-context-v1.png", "frames": 6, "pose": "standing" },
+    { "file": "codex-selection-v1.png", "frames": 6, "pose": "standing" },
+    { "file": "codex-carry-v5.png", "frames": 6, "pose": "carried" },
+    { "file": "codex-land-v1.png", "frames": 6, "pose": "seated" },
+    { "file": "codex-backflip-v3.png", "frames": 8, "pose": "rotating" },
+    { "file": "codex-rest-v1.png", "frames": 1, "pose": "seated" },
+    { "file": "codex-doze-v1.png", "frames": 1, "pose": "seated" },
+    { "file": "codex-sleep-v1.png", "frames": 1, "pose": "seated" }
+  ]
+}
